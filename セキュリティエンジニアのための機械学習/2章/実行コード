@@ -1,0 +1,506 @@
+#必要なファイル入手
+!wget https://github.com/oreilly-japan/ml-security-jp/tree/master/ch02/dataset.csv
+#必要なパッケージインストール
+!pip install optuna
+
+#インポート
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import cross_validate
+
+#データロード
+training_data = np.genfromtxt('dataset.csv', delimiter=',', dtype=np.int32)
+
+#変数Xに最終列以外すべての列を、yには最終列を代入
+X = training_data[:,:-1]
+y = training_data[:, -1]
+
+#scikit-learnのtrain_test_splitを利用してデータセットを訓練用とテスト用に分割する
+#テスト用にはデータセットの20%を割り当てる。
+#これをホールドアウト検証と呼ぶ
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=True, random_state=101)
+
+classifier = LogisticRegression(solver='lbfgs')
+
+# 訓練用データを使って検出器を訓練する。
+classifier.fit(X_train, y_train)
+# 予測させる。
+predictions = classifier.predict(X_test)
+# このフィッシング検出器の正解率を出力させる。
+accuracy = 100.0 * accuracy_score(y_test, predictions)
+print("The accuracy of your Logistic Regression on testing data is: {}".format(accuracy))
+#結果(92%はフィッシングサイトと見抜ける)
+#The accuracy of your Logistic Regression on testing data is: 92.22071460877432
+
+#K分割交差検証も実施
+# 交差検証(5分割)による汎化性能の評価
+scores = cross_val_score(classifier, X_train, y_train, cv=5)
+# 評価結果の出力
+print("Evaluated score by cross-validation(k=5): {}".format(100 * scores.mean()))
+#結果(92%はフィッシングサイトと見抜ける)
+#Evaluated score by cross-validation(k=5): 92.88792144243878
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import cross_validate
+
+class Objective:
+    def __init__(self, X, y):
+        # 変数X,yの初期化
+        self.X = X
+        self.y = y
+
+    def __call__(self, trial):
+        # ターゲットのハイパーパラメータの設定
+        params = {
+            # 最適化に使用するアルゴリズムの候補をカテゴリとして指定
+            'solver' : trial.suggest_categorical('solver',\
+                    ['newton-cg', 'lbfgs', \
+                    'liblinear', 'sag', 'saga']),
+            # 正則化の強さに0.0001から10までを指定
+            'C': trial.suggest_loguniform('C', 0.0001, 10),
+            # ソルバーが収束するまでの最大反復回数
+            'max_iter': trial.suggest_int('max_iter', 100, 100000)
+            }
+
+        model = LogisticRegression(**params)
+
+        # 評価指標として正解率の最大化を目指す
+        scores = cross_validate(model,
+                                X=self.X, y=self.y,
+                                scoring='accuracy',
+                                n_jobs=-1)
+        return scores['test_score'].mean()
+
+#データロード
+training_data = np.genfromtxt('dataset.csv', delimiter=',', dtype=np.int32)
+
+#変数Xに最終列以外すべての列を、yには最終列を代入
+X = training_data[:,:-1]
+y = training_data[:, -1]
+
+#scikit-learnのtrain_test_splitを利用してデータセットを訓練用とテスト用に分割する
+#テスト用にはデータセットの20%を割り当てる。
+#これをホールドアウト検証と呼ぶ
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=True, random_state=101)
+
+# ハイパーパラメータの探索
+objective = Objective(X_train, y_train)
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, timeout=60)
+# ベストのパラメータの出力
+print('params:', study.best_params)
+
+#チューニング結果
+#params: {'solver': 'newton-cg', 'C': 0.0948542211140751, 'max_iter': 24513}
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+class Objective:
+    def __init__(self, X, y):
+        # 変数X,yの初期化
+        self.X = X
+        self.y = y
+
+    def __call__(self, trial):
+        # ターゲットのハイパーパラメータの設定
+        params = {
+            # 最適化に使用するアルゴリズムの候補をカテゴリとして指定
+            'solver' : trial.suggest_categorical('solver',\
+                    ['newton-cg', 'lbfgs', \
+                    'liblinear', 'sag', 'saga']),
+            # 正則化の強さに0.0001から10までを指定
+            'C': trial.suggest_loguniform('C', 0.0001, 10),
+            # ソルバーが収束するまでの最大反復回数
+            'max_iter': trial.suggest_int('max_iter', 100, 100000)
+            }
+
+        model = LogisticRegression(**params)
+
+        # 評価指標として正解率の最大化を目指す
+        scores = cross_validate(model,
+                                X=self.X, y=self.y,
+                                scoring='accuracy',
+                                n_jobs=-1)
+        return scores['test_score'].mean()
+
+#データロード
+training_data = np.genfromtxt('dataset.csv', delimiter=',', dtype=np.int32)
+
+#変数Xに最終列以外すべての列を、yには最終列を代入
+X = training_data[:,:-1]
+y = training_data[:, -1]
+
+#scikit-learnのtrain_test_splitを利用してデータセットを訓練用とテスト用に分割する
+#テスト用にはデータセットの20%を割り当てる。
+#これをホールドアウト検証と呼ぶ
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=True, random_state=101)
+
+# ハイパーパラメータの探索
+objective = Objective(X_train, y_train)
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, timeout=60)
+# ベストのパラメータの出力
+print('params:', study.best_params)
+
+model = LogisticRegression(
+    # ハイパーパラメータ探索で特定した値を設定
+    solver = study.best_params['solver'],
+    C = study.best_params['C'],
+    max_iter = study.best_params['max_iter']
+)
+
+model.fit(X_train, y_train)
+pred = model.predict(X_test)
+# 正解率の出力
+print("Accuracy: {:.5f} %".format(100 * accuracy_score(y_test, pred)))
+# 混同行列の出力
+print(confusion_matrix(y_test, pred))
+#調整した結果(下がってないか、、、？)
+#Accuracy: 92.35640 %
+#混同行列の出力
+#[[ 874   97]
+# [  72 1168]]
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import cross_validate
+
+class Objective_DTC:
+    def __init__(self, X, y):
+        # 変数X,yの初期化
+        self.X = X
+        self.y = y
+
+    def __call__(self, trial):
+        # ターゲットのハイパーパラメータの設定
+        params = {
+            'criterion':\
+            trial.suggest_categorical('criterion', ['gini', 'entropy']),
+            'splitter':\
+            trial.suggest_categorical('splitter', ['best', 'random']),
+            'max_features':\
+            trial.suggest_categorical('max_features', ['auto', 'sqrt', 'log2']),
+            'min_samples_split':\
+            trial.suggest_int('min_samples_split', 2, 64),
+            'max_depth':\
+            trial.suggest_int('max_depth', 2, 64)
+            }
+
+        model = DecisionTreeClassifier(**params)
+
+        # 評価指標として正解率の最大化を目指す
+        scores = cross_validate(model,
+                                X=self.X, y=self.y,
+                                scoring='accuracy',
+                                n_jobs=-1)
+        return scores['test_score'].mean()
+
+#データロード
+training_data = np.genfromtxt('dataset.csv', delimiter=',', dtype=np.int32)
+
+#変数Xに最終列以外すべての列を、yには最終列を代入
+X = training_data[:,:-1]
+y = training_data[:, -1]
+
+#scikit-learnのtrain_test_splitを利用してデータセットを訓練用とテスト用に分割する
+#テスト用にはデータセットの20%を割り当てる。
+#これをホールドアウト検証と呼ぶ
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=True, random_state=101)
+
+
+objective = Objective_DTC(X_train, y_train)
+study = optuna.create_study(direction='maximize')
+# timeoutに60を指定し、最大で1分間探索させる
+study.optimize(objective, timeout=60)
+print('params:', study.best_params)
+#実行結果
+#params: {'criterion': 'gini', 'splitter': 'best', 'max_features': 'sqrt', 'min_samples_split': 2, 'max_depth': 55}
+
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar  1 11:12:48 2022
+
+@author: katayama
+"""
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import cross_validate
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+
+class Objective_DTC:
+    def __init__(self, X, y):
+        # 変数X,yの初期化
+        self.X = X
+        self.y = y
+
+    def __call__(self, trial):
+        # ターゲットのハイパーパラメータの設定
+        params = {
+            'criterion':\
+            trial.suggest_categorical('criterion', ['gini', 'entropy']),
+            'splitter':\
+            trial.suggest_categorical('splitter', ['best', 'random']),
+            'max_features':\
+            trial.suggest_categorical('max_features', ['auto', 'sqrt', 'log2']),
+            'min_samples_split':\
+            trial.suggest_int('min_samples_split', 2, 64),
+            'max_depth':\
+            trial.suggest_int('max_depth', 2, 64)
+            }
+
+        model = DecisionTreeClassifier(**params)
+
+        # 評価指標として正解率の最大化を目指す
+        scores = cross_validate(model,
+                                X=self.X, y=self.y,
+                                scoring='accuracy',
+                                n_jobs=-1)
+        return scores['test_score'].mean()
+
+#データロード
+training_data = np.genfromtxt('dataset.csv', delimiter=',', dtype=np.int32)
+
+#変数Xに最終列以外すべての列を、yには最終列を代入
+X = training_data[:,:-1]
+y = training_data[:, -1]
+
+#scikit-learnのtrain_test_splitを利用してデータセットを訓練用とテスト用に分割する
+#テスト用にはデータセットの20%を割り当てる。
+#これをホールドアウト検証と呼ぶ
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=True, random_state=101)
+
+
+objective = Objective_DTC(X_train, y_train)
+study = optuna.create_study(direction='maximize')
+# timeoutに60を指定し、最大で1分間探索させる
+study.optimize(objective, timeout=60)
+print('params:', study.best_params)
+
+model = DecisionTreeClassifier(
+    # ハイパーパラメータ探索で特定した値を設定
+    criterion = study.best_params['criterion'],
+    splitter = study.best_params['splitter'],
+    max_features = study.best_params['max_features'],
+    min_samples_split = study.best_params['min_samples_split'],
+    max_depth = study.best_params['max_depth']
+)
+
+
+model.fit(X_train, y_train)
+pred = model.predict(X_test)
+
+# 正解率の出力
+print("Accuracy: {:.5f} %".format(100 * accuracy_score(y_test, pred)))
+# 適合率の出力
+print("Precision: {:.5f} %".format(100 * precision_score(y_test, pred,)))
+# 再現率の出力
+print("Recall: {:.5f} %".format(100 * recall_score(y_test, pred)))
+# 混同行列の出力
+print(confusion_matrix(y_test, pred))
+#結果
+#決定木の方がアルゴリズムとして向いている
+#Accuracy: 95.52239 %
+#Precision: 96.41985 %
+#Recall: 95.56452 %
+#[[ 927   44]
+# [  55 1185]]
+
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import StratifiedKFold, cross_validate
+import os
+import codecs
+import pandas as pd
+
+def init_lists(folder):
+    key_list = []
+    file_list = os.listdir(folder)
+    for filename in file_list:
+        f = codecs.open(folder + filename, 'r', encoding='utf-8', errors='ignore')
+        key_list.append(f.read())
+    f.close()
+    return key_list
+
+all_mails = list()
+spam = init_lists('./enron1/spam/')
+ham = init_lists('./enron1/ham/')
+# リストにした迷惑メール(spam)と、通常のメール(ham)を別のリストにコピーし、迷惑メールの場合はラベルを1に、そうでない場合は0にする
+all_mails = [(mail, '1') for mail in spam]
+all_mails += [(mail, '0') for mail in ham]
+
+# DataFrameにメールの文面とラベルを列に設定してロードする
+df = pd.DataFrame(all_mails, columns=['text', 'label'])
+#結果
+print(df)
+#内容
+                                                   text label
+0     Subject: dobmeos with hgh my energy level has ...     1
+1     Subject: your prescription is ready . . oxwq s...     1
+2     Subject: get that new car 8434\r\npeople nowth...     1
+3     Subject: await your response\r\ndear partner ,...     1
+4     Subject: coca cola , mbna america , nascar par...     1
+                                                ...   ...
+5167  Subject: re : tenaska iv\r\ni ' ll call you on...     0
+5168  Subject: generic contract\r\nhi daren ,\r\nsor...     0
+5169  Subject: re : contracts and credit\r\nthanks -...     0
+5170  Subject: re : tenaska iv\r\nok , since we don ...     0
+5171  Subject: re : tenaska iv\r\ni tried calling yo...     0
+
+[5172 rows x 2 columns]
+'
+
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import StratifiedKFold, cross_validate
+import os
+import codecs
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+def init_lists(folder):
+    key_list = []
+    file_list = os.listdir(folder)
+    for filename in file_list:
+        f = codecs.open(folder + filename, 'r', encoding='utf-8', errors='ignore')
+        key_list.append(f.read())
+    f.close()
+    return key_list
+
+all_mails = list()
+spam = init_lists('./enron1/spam/')
+ham = init_lists('./enron1/ham/')
+# リストにした迷惑メール(spam)と、通常のメール(ham)を別のリストにコピーし、迷惑メールの場合はラベルを1に、そうでない場合は0にする
+all_mails = [(mail, '1') for mail in spam]
+all_mails += [(mail, '0') for mail in ham]
+
+# DataFrameにメールの文面とラベルを列に設定してロードする
+df = pd.DataFrame(all_mails, columns=['text', 'label'])
+
+# TfidfVectorizerを初期化する。stop_wordsにenglishを指定し、一般的な単語を除外する
+tfidf = TfidfVectorizer(stop_words="english", lowercase=False)
+
+X = tfidf.fit_transform(df['text'])
+column_names = tfidf.get_feature_names()
+
+# Xにベクトル化した値を整形して代入
+X = pd.DataFrame(X.toarray())
+X = X.astype('float')
+# カラム名を設定
+X.columns = column_names
+y = df['label'].astype('float')
+#結果
+print(X)
+#内容
+            00       000  0000  000000  ...  zzo  zzocb  zzso  zzsyt
+0     0.000000  0.000000   0.0     0.0  ...  0.0    0.0   0.0    0.0
+1     0.000000  0.000000   0.0     0.0  ...  0.0    0.0   0.0    0.0
+2     0.000000  0.000000   0.0     0.0  ...  0.0    0.0   0.0    0.0
+3     0.022849  0.021961   0.0     0.0  ...  0.0    0.0   0.0    0.0
+4     0.000000  0.007405   0.0     0.0  ...  0.0    0.0   0.0    0.0
+       ...       ...   ...     ...  ...  ...    ...   ...    ...
+5167  0.000000  0.038337   0.0     0.0  ...  0.0    0.0   0.0    0.0
+5168  0.000000  0.000000   0.0     0.0  ...  0.0    0.0   0.0    0.0
+5169  0.000000  0.000000   0.0     0.0  ...  0.0    0.0   0.0    0.0
+5170  0.000000  0.030913   0.0     0.0  ...  0.0    0.0   0.0    0.0
+5171  0.000000  0.029607   0.0     0.0  ...  0.0    0.0   0.0    0.0
+
+[5172 rows x 50157 columns]
+
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar  1 11:34:59 2022
+
+@author: katayama
+"""
+from sklearn.metrics import accuracy_score 
+from sklearn.model_selection import train_test_split
+import numpy as np
+import optuna
+from sklearn.model_selection import StratifiedKFold, cross_validate
+import os
+import codecs
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+import optuna.integration.lightgbm as olgb
+
+def init_lists(folder):
+    key_list = []
+    file_list = os.listdir(folder)
+    for filename in file_list:
+        f = codecs.open(folder + filename, 'r', encoding='utf-8', errors='ignore')
+        key_list.append(f.read())
+    f.close()
+    return key_list
+
+all_mails = list()
+spam = init_lists('./enron1/spam/')
+ham = init_lists('./enron1/ham/')
+# リストにした迷惑メール(spam)と、通常のメール(ham)を別のリストにコピーし、迷惑メールの場合はラベルを1に、そうでない場合は0にする
+all_mails = [(mail, '1') for mail in spam]
+all_mails += [(mail, '0') for mail in ham]
+
+# DataFrameにメールの文面とラベルを列に設定してロードする
+df = pd.DataFrame(all_mails, columns=['text', 'label'])
+
+# TfidfVectorizerを初期化する。stop_wordsにenglishを指定し、一般的な単語を除外する
+tfidf = TfidfVectorizer(stop_words="english", lowercase=False)
+
+X = tfidf.fit_transform(df['text'])
+column_names = tfidf.get_feature_names()
+
+# Xにベクトル化した値を整形して代入
+X = pd.DataFrame(X.toarray())
+X = X.astype('float')
+# カラム名を設定
+X.columns = column_names
+y = df['label'].astype('float')
+
+# データセットを訓練用とテスト用に分割
+X_train, X_test, y_train, y_test =\
+ train_test_split(X, y, test_size=0.2, shuffle=True, random_state=101)
+
+# LightGBM用のデータセットに変換
+train = olgb.Dataset(X_train, y_train)
+
+# パラメータの設定
+params = {
+    "objective": "binary",
+    "verbosity": -1,
+    "boosting_type": "gbdt",
+}
+
+# 交差検証を使用したハイパーパラメータの探索
+tuner = olgb.LightGBMTunerCV(params, train, num_boost_round=100)
+
+# ハイパーパラメータ探索の実行
+tuner.run()
